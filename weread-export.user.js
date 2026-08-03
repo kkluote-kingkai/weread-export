@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信读书数据导出 WeRead Exporter
 // @namespace    https://github.com/kkluote-kingkai/weread-export
-// @version      0.1.0
+// @version      0.3.0
 // @description  一键导出微信读书全部数据:书架、划线、想法、笔记、阅读时长。输出 Markdown + JSON,支持增量/全量。
 // @author       kkluote-kingkai
 // @match        https://weread.qq.com/*
@@ -463,7 +463,21 @@
     const { all, log } = opts;
     log('开始导出...');
 
-    // 1. 验证登录态
+    // 0. 阅读页上下文:bookmarklist 仅在有阅读会话时返回数据
+    if (!location.pathname.startsWith('/web/reader/')) {
+      log('当前不在阅读页,bookmarklist 需要阅读会话。自动跳转到一本书,到达后会自动继续...');
+      try {
+        const probe = await fetchNotebooks(log);
+        if (probe.length === 0) throw new Error('没有找到任何有笔记的书');
+        sessionStorage.setItem('wr_export_pending', JSON.stringify({ all, ts: Date.now() }));
+        location.href = 'https://weread.qq.com/web/reader/' + encodeURIComponent(probe[0].bookId);
+        return;
+      } catch (e) {
+        throw new Error('跳转阅读页失败: ' + e.message);
+      }
+    }
+
+    // 1. 笔记本列表
     let books;
     try {
       log('读取笔记本列表...');
@@ -479,17 +493,7 @@
     }
     log('共 ' + books.length + ' 本书含笔记,开始抓取细节...');
 
-    // 2. 书架(尽力而为)
-    let shelf = null;
-    try {
-      shelf = await fetchShelf(log, books);
-      if (shelf.ok) log('书架: ' + shelf.books.length + ' 本');
-      else log(shelf.reason);
-    } catch (e) {
-      log('书架跳过: ' + e.message);
-    }
-
-    // 3. 全量/增量过滤
+    // 2. 全量/增量过滤
     let targets = books;
     if (!all) {
       targets = books.filter(
@@ -500,6 +504,16 @@
 
     // 4. 并发抓取每本书
     const details = await mapLimit(targets, CONCURRENCY, (entry) => fetchBookComplete(entry, log), log);
+
+    // 4b. 书架(尽力而为;此时已拿到想法,可从中提取 userVid)
+    let shelf = null;
+    try {
+      shelf = await fetchShelf(log, details);
+      if (shelf.ok) log('书架: ' + shelf.books.length + ' 本');
+      else log(shelf.reason);
+    } catch (e) {
+      log('书架跳过: ' + e.message);
+    }
 
     // 5. 汇总
     const result = {
@@ -525,6 +539,19 @@
 
   // 注入 UI(延迟等页面稳定)
   setTimeout(() => {
-    try { ensureUI(); } catch (e) { console.error('[WeRead Export]', e); }
+    try {
+      const ui = ensureUI();
+      // 自动续跑:从首页跳转到阅读页后,检测到待办导出则自动开始
+      const pendingRaw = sessionStorage.getItem('wr_export_pending');
+      if (pendingRaw && location.pathname.startsWith('/web/reader/')) {
+        sessionStorage.removeItem('wr_export_pending');
+        let pending = {};
+        try { pending = JSON.parse(pendingRaw); } catch (e) { /* ignore */ }
+        ui.log('检测到待续跑导出,自动开始(阅读会话已就绪)...');
+        runExport({ all: !!pending.all, log: ui.log })
+          .then(() => ui.log('✅ 导出完成!已下载 .md 和 .json 文件(浏览器可能拦截第二个下载,请在下载栏允许)'))
+          .catch((e) => ui.log('❌ 导出失败: ' + e.message));
+      }
+    } catch (e) { console.error('[WeRead Export]', e); }
   }, 1500);
 })();
