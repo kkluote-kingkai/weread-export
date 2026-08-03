@@ -103,9 +103,30 @@
     return books;
   }
 
-  async function fetchBookHighlights(bookId) {
-    const data = await apiGet('/web/book/bookmarklist?bookId=' + bookId);
-    const arr = (data.updated || []).filter((b) => b && b.markText);
+  async function fetchBookHighlights(bookId, expectedCount, log) {
+    // bookmarklist 偶发静默返回空(限速/临时失败):带重试+退避
+    const MAX_TRIES = 4;
+    const BACKOFF = [1500, 4000, 10000, 20000];
+    let arr = [];
+    for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+      try {
+        const data = await apiGet('/web/book/bookmarklist?bookId=' + bookId);
+        arr = (data.updated || []).filter((b) => b && b.markText);
+        const got = arr.length;
+        // 空结果但预期有划线 → 重试;或者拿到任何结果 → 结束
+        if (got > 0 || !expectedCount) return arr.map((b) => ({
+          chapterUid: b.chapterUid,
+          markText: b.markText,
+          color: b.color,
+          createTime: b.createTime,
+        }));
+        if (log) log(`  ⚠️ bookmarklist 空(期望${expectedCount}条),${BACKOFF[attempt] / 1000}s后重试(${attempt + 2}/${MAX_TRIES})`);
+      } catch (e) {
+        if (attempt === MAX_TRIES - 1) throw e;
+        if (log) log(`  ⚠️ bookmarklist 请求失败: ${e.message},重试...`);
+      }
+      await sleep(BACKOFF[Math.min(attempt, BACKOFF.length - 1)]);
+    }
     return arr.map((b) => ({
       chapterUid: b.chapterUid,
       markText: b.markText,
@@ -183,8 +204,8 @@
     }
   }
 
-  async function fetchShelf(log) {
-    // 书架:需要 userVid,优先取 cookie,其次 login/getinfo
+  async function fetchShelf(log, booksData) {
+    // 书架:需要 userVid,优先取 cookie,其次 login/getinfo,最后从 reviewId 前缀提取
     let vid = '';
     const m = document.cookie.match(/(?:^|; )wr_vid=([^;]+)/);
     if (m) vid = m[1];
@@ -193,6 +214,18 @@
         const g = await apiGet('/web/login/getinfo');
         vid = g.userVid || g.vid || g.suid || '';
       } catch (e) { /* ignore */ }
+    }
+    if (!vid) {
+      // reviewId 形如 "<vid>_xxxxx",从第一条想法里提取
+      for (const b of booksData || []) {
+        for (const t of b.thoughts || []) {
+          if (t.reviewId && String(t.reviewId).includes('_')) {
+            vid = String(t.reviewId).split('_')[0];
+            break;
+          }
+        }
+        if (vid) break;
+      }
     }
     if (!vid) return { ok: false, reason: '无法获取 userVid(cookie wr_vid 缺失),书架跳过' };
     try {
@@ -238,7 +271,7 @@
     };
 
     await sleep(SLEEP_MS);
-    try { out.highlights = await fetchBookHighlights(bookId); }
+    try { out.highlights = await fetchBookHighlights(bookId, out.noteCount, log); }
     catch (e) { out.errors.push('划线: ' + e.message); }
 
     await sleep(SLEEP_MS);
@@ -449,7 +482,7 @@
     // 2. 书架(尽力而为)
     let shelf = null;
     try {
-      shelf = await fetchShelf(log);
+      shelf = await fetchShelf(log, books);
       if (shelf.ok) log('书架: ' + shelf.books.length + ' 本');
       else log(shelf.reason);
     } catch (e) {
