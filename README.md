@@ -77,7 +77,30 @@ Tampermonkey 用户脚本,一键导出你在微信读书的全部数据:书架�
 | 点导出提示"登录已失效" | 刷新 weread.qq.com 页面,重新扫码登录后重试 |
 | 没弹下载 | 检查浏览器是否拦截多个下载;脚本会在下载栏出现两次 |
 | 某本书划线缺失 | 该书可能用了"书签"(非划线),书签暂不导出;JSON 中该书 errors 字段会有说明 |
-| 想改导出内容 | 打开 Tampermonkey 管理面板编辑脚本,`buildMarkdown()` 函数可自定义格式 |
+| 想改导出内容 | 打开 Tampermonkey 管理面板编辑脚本,`buildMarkdown()` 函数可自定义格式(源码在 `src/markdown.js`) |
+
+## 开发
+
+源码在 `src/`(ES modules),`weread-export.user.js` 是 esbuild 打包产物,请勿直接编辑。
+
+```bash
+npm install     # 安装 esbuild + vitest
+npm run build   # 打包 src/ → weread-export.user.js(自动写入 userscript 头,版本号取自 package.json)
+npm test        # vitest 单测
+npm run dev     # watch 模式
+```
+
+| 模块 | 职责 |
+|------|------|
+| `src/config.js` | 并发/限速/重试退避/接口路径常量 |
+| `src/api.js` | fetch 封装、errCode 处理、全局限速器、通用重试 `withRetry` |
+| `src/paginate.js` | 统一游标分页 `collectPages`(notebook 的 lastSort、review 的 syncKey 共用) |
+| `src/model.js` | API 原始字段 → 导出结构归一化 |
+| `src/fetchers.js` | 各数据接口抓取 + 并发池 + 单本全量 `fetchBookComplete` |
+| `src/markdown.js` | Markdown 渲染(多行划线逐行引用) |
+| `src/ui.js` | 右下角导出面板 |
+| `src/export.js` | `runExport` 编排 + 阅读页跳转续跑 |
+| `src/index.js` | 入口:注入 UI、检测待续跑 |
 
 ## 许可证
 
