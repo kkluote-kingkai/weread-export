@@ -1,0 +1,18 @@
+{
+  "name": "weread-export",
+  "version": "0.4.0",
+  "description": "微信读书数据导出 Tampermonkey 用户脚本:书架、划线、想法、笔记、阅读时长",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "dev": "node scripts/build.mjs --watch"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "playwright": "^1.65.0",
+    "vitest": "^3.0.0"
+  }
+}
