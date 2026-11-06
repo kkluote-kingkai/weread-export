@@ -37,6 +37,7 @@ describe('buildMarkdown', () => {
     expect(md).toContain('- 书架总数: 3');
     expect(md).toContain('## 《三体》  刘慈欣');
     expect(md).toContain('- 阅读时长: 12 小时 35 分钟');
+    expect(md).toContain('- 阅读进度: 1%');
   });
 
   it('划线按章节分组且多行 markText 每行都有引用符', () => {

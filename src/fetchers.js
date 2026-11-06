@@ -127,8 +127,8 @@ export async function fetchShelf(log, booksData) {
     const data = await apiGet(
       ENDPOINTS.shelfSync + '?userVid=' + encodeURIComponent(vid) + '&synckey=0&lectureSynckey=0'
     );
-    const shelf = (data.shelf && data.shelf.booksAndArchives) || [];
-    const books = shelf.filter((s) => s && s.book).map(mapShelfEntry);
+    const shelf = (data.shelf && data.shelf.booksAndArchives) || data.books || [];
+    const books = shelf.filter((s) => s && (s.book || s.bookId)).map(mapShelfEntry);
     return { ok: true, books, userVid: vid };
   } catch (e) {
     return { ok: false, reason: '书架抓取失败: ' + e.message };

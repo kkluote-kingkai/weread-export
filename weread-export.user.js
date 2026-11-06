@@ -201,14 +201,17 @@
     createTime: r.createTime,
     reviewId: r.reviewId
   });
-  var mapShelfEntry = (s) => ({
-    bookId: s.book.bookId,
-    title: s.book.title || "",
-    author: s.book.author || "",
-    cover: s.book.cover || "",
-    format: s.book.format || "",
-    readUpdateTime: s.readUpdateTime || 0
-  });
+  var mapShelfEntry = (s) => {
+    const b = s.book ? { ...s.book, readUpdateTime: s.readUpdateTime } : s;
+    return {
+      bookId: b.bookId,
+      title: b.title || "",
+      author: b.author || "",
+      cover: b.cover || "",
+      format: b.format || "",
+      readUpdateTime: b.readUpdateTime || 0
+    };
+  };
   function createBookRecord(entry) {
     const base = entry.book || {};
     return {
@@ -356,8 +359,8 @@
       const data = await apiGet(
         ENDPOINTS.shelfSync + "?userVid=" + encodeURIComponent(vid) + "&synckey=0&lectureSynckey=0"
       );
-      const shelf = data.shelf && data.shelf.booksAndArchives || [];
-      const books = shelf.filter((s) => s && s.book).map(mapShelfEntry);
+      const shelf = data.shelf && data.shelf.booksAndArchives || data.books || [];
+      const books = shelf.filter((s) => s && (s.book || s.bookId)).map(mapShelfEntry);
       return { ok: true, books, userVid: vid };
     } catch (e) {
       return { ok: false, reason: "\u4E66\u67B6\u6293\u53D6\u5931\u8D25: " + e.message };
@@ -432,7 +435,7 @@
   function renderBookMeta(L, b) {
     L.push("## \u300A" + b.title + "\u300B" + (b.author ? "  " + b.author : ""));
     L.push("");
-    L.push("- \u9605\u8BFB\u8FDB\u5EA6: " + (b.readingProgress !== null ? Math.round(b.readingProgress * 100) + "%" : "\u672A\u77E5"));
+    L.push("- \u9605\u8BFB\u8FDB\u5EA6: " + (b.readingProgress !== null ? Math.round(b.readingProgress) + "%" : "\u672A\u77E5"));
     L.push("- \u9605\u8BFB\u65F6\u957F: " + fmtDuration(b.readingTimeSec));
     if (b.finishedDate) L.push("- \u8BFB\u5B8C\u65E5\u671F: " + fmtDate(b.finishedDate));
     if (b.meta.isbn) L.push("- ISBN: " + b.meta.isbn);

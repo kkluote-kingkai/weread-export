@@ -15,14 +15,18 @@ export const mapReview = (r) => ({
   reviewId: r.reviewId,
 });
 
-export const mapShelfEntry = (s) => ({
-  bookId: s.book.bookId,
-  title: s.book.title || '',
-  author: s.book.author || '',
-  cover: s.book.cover || '',
-  format: s.book.format || '',
-  readUpdateTime: s.readUpdateTime || 0,
-});
+// shelf/sync 现在返回扁平书籍对象;旧版是 {book, readUpdateTime} 包裹结构
+export const mapShelfEntry = (s) => {
+  const b = s.book ? { ...s.book, readUpdateTime: s.readUpdateTime } : s;
+  return {
+    bookId: b.bookId,
+    title: b.title || '',
+    author: b.author || '',
+    cover: b.cover || '',
+    format: b.format || '',
+    readUpdateTime: b.readUpdateTime || 0,
+  };
+};
 
 export function createBookRecord(entry) {
   const base = entry.book || {};

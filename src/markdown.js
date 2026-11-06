@@ -25,7 +25,7 @@ function renderSummary(L, result) {
 function renderBookMeta(L, b) {
   L.push('## 《' + b.title + '》' + (b.author ? '  ' + b.author : ''));
   L.push('');
-  L.push('- 阅读进度: ' + (b.readingProgress !== null ? Math.round(b.readingProgress * 100) + '%' : '未知'));
+  L.push('- 阅读进度: ' + (b.readingProgress !== null ? Math.round(b.readingProgress) + '%' : '未知'));
   L.push('- 阅读时长: ' + fmtDuration(b.readingTimeSec));
   if (b.finishedDate) L.push('- 读完日期: ' + fmtDate(b.finishedDate));
   if (b.meta.isbn) L.push('- ISBN: ' + b.meta.isbn);
